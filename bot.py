@@ -1,5 +1,5 @@
 # ======== اینجا توکن ربات تلگرام را بگذار ========
-TOKEN = "8419273751:AAFbgA1GbDkj9gVo721VBB_bWHEf8lmCwek"
+TOKEN = ""
 # ===============================================
 
 from telegram import Update
